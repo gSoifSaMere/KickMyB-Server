@@ -98,7 +98,7 @@ public class ServiceTaskImpl implements ServiceTask {
     public List<HomeItemResponse> home(Long userID) {
         MUser user = repoUser.findById(userID).get();
         List<HomeItemResponse> res = new ArrayList<>();
-        for (MTask t : user.tasks.stream().filter(t -> t.deadline == null).toArray(MTask[]::new)) {
+        for (MTask t : user.tasks.stream().filter(t -> t.deleteDate == null).toArray(MTask[]::new)) {
             HomeItemResponse r = new HomeItemResponse();
             r.id = t.id;
             r.percentageDone = percentageDone(t);
