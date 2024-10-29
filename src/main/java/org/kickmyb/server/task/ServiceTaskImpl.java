@@ -3,6 +3,7 @@ package org.kickmyb.server.task;
 import org.joda.time.DateTime;
 import org.kickmyb.server.account.MUser;
 import org.kickmyb.server.account.MUserRepository;
+import org.kickmyb.server.photo.MPhotoRepository;
 import org.kickmyb.transfer.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -19,6 +20,8 @@ public class ServiceTaskImpl implements ServiceTask {
     @Autowired
     MUserRepository repoUser;
     @Autowired MTaskRepository repo;
+    @Autowired
+    MPhotoRepository repoPhoto;
     @Autowired MProgressEventRepository repoProgressEvent;
 
     private int percentage(Date start, Date current, Date end){
@@ -33,7 +36,7 @@ public class ServiceTaskImpl implements ServiceTask {
     @Override
     public TaskDetailResponse detail(Long id, MUser user) {
         //MTask element = user.tasks.stream().filter(elt -> elt.id == id).findFirst().get();
-        MTask element = repo.findById(id).get();
+        MTask element = repo.findById(id).filter(mTask -> mTask.deleteDate == null).get();
         TaskDetailResponse response = new TaskDetailResponse();
         response.name = element.name;
         response.id = element.id;
@@ -95,7 +98,7 @@ public class ServiceTaskImpl implements ServiceTask {
     public List<HomeItemResponse> home(Long userID) {
         MUser user = repoUser.findById(userID).get();
         List<HomeItemResponse> res = new ArrayList<>();
-        for (MTask t : user.tasks) {
+        for (MTask t : user.tasks.stream().filter(t -> t.deadline == null).toArray(MTask[]::new)) {
             HomeItemResponse r = new HomeItemResponse();
             r.id = t.id;
             r.percentageDone = percentageDone(t);
@@ -136,7 +139,7 @@ public class ServiceTaskImpl implements ServiceTask {
     public List<HomeItemPhotoResponse> homePhoto(Long userID) {
         MUser user = repoUser.findById(userID).get();
         List<HomeItemPhotoResponse> res = new ArrayList<>();
-        for (MTask t : user.tasks) {
+        for (MTask t : user.tasks.stream().filter(t -> t.deleteDate == null).toArray(MTask[]::new)) {
             HomeItemPhotoResponse r = new HomeItemPhotoResponse();
             r.id = t.id;
             r.percentageDone = percentageDone(t);
@@ -154,8 +157,33 @@ public class ServiceTaskImpl implements ServiceTask {
     }
 
     @Override
+    @Transactional
+    public void hardDelete(long id, MUser user) {
+        MTask element = repo.findById(id).get();
+        user.tasks.remove(element);
+        repoUser.save(user);
+        if(element.photo != null) {
+            repoProgressEvent.deleteAll(element.events);
+            repoPhoto.delete(element.photo);
+        }
+        repo.delete(element);
+    }
+
+    @Override
+    @Transactional
+    public void softDelete(long id, MUser user) {
+        MTask element = repo.findById(id).get();
+        element.deleteDate = DateTime.now().toDate();
+        element.photo.deleteDate = DateTime.now().toDate();
+        for (MProgressEvent event : element.events) {
+            event.deleteDate = DateTime.now().toDate();
+        }
+        repo.save(element);
+    }
+
+    @Override
     public TaskDetailPhotoResponse detailPhoto(Long id, MUser user) {
-        MTask element = user.tasks.stream().filter(elt -> elt.id == id).findFirst().get();
+        MTask element = user.tasks.stream().filter(elt -> elt.id == id && elt.deleteDate == null).findFirst().get();
         TaskDetailPhotoResponse response = new TaskDetailPhotoResponse();
         response.name = element.name;
         response.id = element.id;

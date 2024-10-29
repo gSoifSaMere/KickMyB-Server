@@ -26,12 +26,28 @@ import java.util.List;
 @Controller     // indique à Spring qu'il y a des points d'entrée dans la classe
 public class ControllerPhoto {
 
-    @Autowired
-    private ServicePhoto servicePhoto;
-    @Autowired
-    private ServiceTask serviceTask;
+    @Autowired private ServicePhoto servicePhoto;
+    @Autowired private ServiceTask serviceTask;
 
-    @PostMapping(value = "/file", produces = "text/plain")
+    @DeleteMapping("/api/task/hard/{id}")
+    public @ResponseBody String hardDelete(@PathVariable long id) {
+        System.out.println("KICKB SERVER : Delete task " + id);
+        ConfigHTTP.attenteArticifielle();
+        MUser user = currentUser();
+        serviceTask.hardDelete(id, user);
+        return "";
+    }
+
+    @DeleteMapping("/api/task/soft/{id}")
+    public @ResponseBody String softDelete(@PathVariable long id) {
+        System.out.println("KICKB SERVER : Delete task " + id);
+        ConfigHTTP.attenteArticifielle();
+        MUser user = currentUser();
+        serviceTask.softDelete(id, user);
+        return "";
+    }
+
+    @PostMapping("/file")
     public ResponseEntity<String> up(@RequestParam("file") MultipartFile file, @RequestParam("taskID") Long taskID) throws IOException {
         System.out.println("PHOTO : upload request " + file.getContentType());
         ConfigHTTP.attenteArticifielle();
@@ -44,12 +60,13 @@ public class ControllerPhoto {
         System.out.println("PHOTO : download request " + id + " width " + maxWidth);
         ConfigHTTP.attenteArticifielle();
         MPhoto pic = servicePhoto.getFile(id);
+        // TODO explain resizing logic
         if (maxWidth == null) { // no resizing
             return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(pic.blob);
         } else {
             ByteArrayInputStream bais = new ByteArrayInputStream(pic.blob);
             BufferedImage bi = ImageIO.read(bais);
-            BufferedImage resized = Scalr.resize(bi, Scalr.Method.ULTRA_QUALITY, maxWidth);
+            BufferedImage resized = Scalr.resize(bi, Scalr.Method.ULTRA_QUALITY,  maxWidth);
 
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             ImageIO.write(resized, "jpg", baos);
@@ -59,7 +76,7 @@ public class ControllerPhoto {
     }
 
     //Méthode utilisée uniquement pour les exercices
-    @PostMapping(value = "/singleFile", produces = "text/plain")
+    @PostMapping("/singleFile")
     public ResponseEntity<String> upSingle(@RequestParam("file") MultipartFile file) throws IOException {
         System.out.println("PHOTO : single upload request " + file.getContentType());
         ConfigHTTP.attenteArticifielle();
@@ -74,7 +91,7 @@ public class ControllerPhoto {
     }
 
     //Méthode utilisée uniquement pour les exercices
-    @PostMapping(value = "/api/singleFile", produces = "text/plain")
+    @PostMapping("/api/singleFile")
     public ResponseEntity<String> upSingleCookie(@RequestParam("file") MultipartFile file) throws IOException {
         System.out.println("PHOTO : cookie " + file.getContentType());
         return upSingle(file);
@@ -89,16 +106,17 @@ public class ControllerPhoto {
     //Méthode utilisée pour récupérer les items de la liste des tâches avec des photos
     @GetMapping("/api/home/photo")
     public @ResponseBody List<HomeItemPhotoResponse> homePhoto() {
-        System.out.println("KICKB SERVER : Task list  with cookie");
+        System.out.println("KICKB SERVER : Task list  with cookie" );
         ConfigHTTP.attenteArticifielle();
         MUser user = currentUser();
         return serviceTask.homePhoto(user.id);
     }
 
-    //Méthode utilisée pour récupérer le détail d'une tâche avec des photos
+    //Méthode utilisée pour récupérer le détaild'une tâche avec des photos
     @GetMapping("/api/detail/photo/{id}")
-    public @ResponseBody TaskDetailPhotoResponse detailPhoto(@PathVariable long id) {
-        System.out.println("KICKB SERVER : Detail  with cookie ");
+    public @ResponseBody
+    TaskDetailPhotoResponse detailPhoto(@PathVariable long id) {
+        System.out.println("KICKB SERVER : Detail  with cookie " );
         ConfigHTTP.attenteArticifielle();
         MUser user = currentUser();
         return serviceTask.detailPhoto(id, user);
@@ -106,7 +124,8 @@ public class ControllerPhoto {
 
     private MUser currentUser() {
         UserDetails ud = (UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return serviceTask.userFromUsername(ud.getUsername());
+        MUser user = serviceTask.userFromUsername(ud.getUsername());
+        return user;
     }
 
 
